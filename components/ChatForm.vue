@@ -1,9 +1,11 @@
 <template>
   <div class="input-container">
-    <textarea v-model='text' @keydown.enter='addMessage' @click='openLoginModal'></textarea>
+    <img v-if="isAuthenicated" :src="user.photoURL" class="avatar">
+    <textarea v-model="text" v-if="isAuthenicated" @keydown.enter="addMessage"></textarea>
+    <textarea v-model="text" v-else @click="openLoginModal"></textarea>
     <el-dialog title="" :visible.sync="dialogVisible" width="30%">
       <div class="image-container">
-       <img src="~/assets/signin.png" @click='login'/>
+       <img src="~/assets/signin.png" @click="login"/>
       </div>
     </el-dialog>
   </div>
@@ -11,6 +13,7 @@
 
 <script>
 import { db, firebase } from '~/plugins/firebase.js';
+import { mapActions } from 'vuex';
 import Vue from 'vue';
 import ElementUI from 'element-ui';
 import 'element-ui/lib/theme-chalk/index.css';
@@ -23,12 +26,22 @@ export default {
       text: null
     };
   },
+  computed: {
+    user() {
+      return this.$store.state.user;
+    },
+    isAuthenicated() {
+      return this.$store.getters.isAuthenicated;
+    }
+  },
   methods: {
+    ...mapActions(['setUser']),
     login() {
       const provider = new firebase.auth.GoogleAuthProvider();
       firebase.auth().signInWithPopup(provider).then(result => {
         const user = result.user;
-        console.log(user);
+        this.setUser(user);
+        console.log(this.$store.state.user);
         this.dialogVisible = false;
       }).catch(error => {
         window.alert(error);
@@ -40,7 +53,16 @@ export default {
     addMessage(event) {
       if (this.keyDownedForJPConversion(event)) {return;}
       const channelId = this.$route.params.id;
-      db.collection('channels').doc(channelId).collection('messages').add({text: this.text, createdAt: new Date().getTime()}).then(() => {
+      db.collection('channels').doc(channelId).collection('messages').add(
+        {
+          text: this.text,
+          createdAt: new Date().getTime(),
+          user:{
+            name: this.user.displayName,
+            thumbnail: this.user.photoURL
+          }
+        }
+      ).then(() => {
         this.text = null;
       });
     },
@@ -56,6 +78,12 @@ export default {
 .input-container {
  padding: 10px;
  height: 100%;
+ display: flex;
+}
+
+.avatar {
+ height: 100%;
+ width: auto;
 }
 
 textarea {
